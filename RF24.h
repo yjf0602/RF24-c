@@ -1495,7 +1495,7 @@ void rf24_toggleAllPipes(RF24* rf, unsigned char isEnabled);
  * This is a helper function to setRadiation() and setDataRate()
  * @param speed The desired data rate.
  */
-inline unsigned char _data_rate_reg_value(RF24* rf, rf24_datarate_e speed);
+unsigned char _data_rate_reg_value(RF24* rf, rf24_datarate_e speed);
 
 /**
  * @brief Manipulate the @ref PALevel
@@ -1504,7 +1504,7 @@ inline unsigned char _data_rate_reg_value(RF24* rf, rf24_datarate_e speed);
  * @param level The desired @ref PALevel.
  * @param lnaEnable Toggle the LNA feature.
  */
-inline unsigned char _pa_level_reg_value(unsigned char level, unsigned char lnaEnable);
+unsigned char _pa_level_reg_value(unsigned char level, unsigned char lnaEnable);
 
 /**
  * @brief configure the RF_SETUP register in 1 transaction

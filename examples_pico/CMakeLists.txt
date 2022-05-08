@@ -1,36 +1,38 @@
 cmake_minimum_required(VERSION 3.12)
 
 # Pull in SDK (must be before project)
-include(../cmake/pico_sdk_import.cmake)
+include(pico_sdk_import.cmake)
 
 project(pico_examples C CXX ASM)
 
 # Initialize the Pico SDK
 pico_sdk_init()
 
-# In YOUR project, include RF24's CMakeLists.txt
-# giving the path depending on where the library
-# is cloned to in your project
-include(../CMakeLists.txt)
-
 # iterate over a list of examples by name
 set(EXAMPLES_LIST
     gettingStarted
-    acknowledgementPayloads
-    streamingData
-    manualAcknowledgements
-    multiceiverDemo
-    interruptConfigure
-    scanner
+    # acknowledgementPayloads
+    # streamingData
+    # manualAcknowledgements
+    # multiceiverDemo
+    # interruptConfigure
+    # scanner
 )
 
 foreach(example ${EXAMPLES_LIST})
     # make a target
-    add_executable(${example} ${example}.cpp defaultPins.h)
+    add_executable(${example}
+        ${example}.c
+        ../RF24.c 
+        ../RF24.h 
+        ../RF24_config.h 
+        ../nRF24L01.h 
+        pico_port.c
+        pico_port.h
+        defaultPins.h)
 
     # link the necessary libs to the target
     target_link_libraries(${example} PUBLIC
-        RF24
         pico_stdlib
         hardware_spi
         hardware_gpio

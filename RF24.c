@@ -9,12 +9,18 @@
 #include "nRF24L01.h"
 #include "RF24_config.h"
 #include "RF24.h"
-#include <stdio.h>
+#include <string.h>
 
 /****************************************************************************/
 
 void rf24_init(RF24 *rf)
 {
+    rf->payload_size = 32;
+    rf->_is_p_variant = 0;
+    rf->_is_p0_rx = 0;
+    rf->addr_width = 5;
+    rf->dynamic_payloads_enabled = 1;
+    rf->csDelay = 5;
     rf->pipe0_reading_address[0] = 0;
     rf->spi_speed = RF24_SPI_SPEED;
 }
@@ -24,6 +30,7 @@ void rf24_init(RF24 *rf)
 void rf24_beginTransaction(RF24* rf)
 {
     rf->set_csn_pin(0);
+    rf->delay_us(rf->csDelay);
 }
 
 /****************************************************************************/
@@ -31,6 +38,7 @@ void rf24_beginTransaction(RF24* rf)
 void rf24_endTransaction(RF24* rf)
 {
     rf->set_csn_pin(1);
+    rf->delay_us(rf->csDelay);
 }
 
 /****************************************************************************/
@@ -96,7 +104,7 @@ void rf24_write_payload(RF24* rf, const void* buf, unsigned char len, const unsi
     const unsigned char* current = (const unsigned char *)(buf);
 
     unsigned char blank_len = !len ? 1 : 0;
-    if (!dynamic_payloads_enabled) {
+    if (!rf->dynamic_payloads_enabled) {
         len = rf24_min(len, rf->payload_size);
         blank_len = (unsigned char)(rf->payload_size - len);
     }
@@ -121,7 +129,7 @@ void rf24_read_payload(RF24* rf, void* buf, unsigned char len)
     unsigned char* current = (unsigned char*)(buf);
 
     unsigned char blank_len = 0;
-    if (!dynamic_payloads_enabled) {
+    if (!rf->dynamic_payloads_enabled) {
         len = rf24_min(len, rf->payload_size);
         blank_len = (unsigned char)(rf->payload_size - len);
     }
@@ -131,7 +139,7 @@ void rf24_read_payload(RF24* rf, void* buf, unsigned char len)
 
     rf24_beginTransaction(rf);
 
-    status = rf->spi_transfer(R_RX_PAYLOAD);
+    rf->status = rf->spi_transfer(R_RX_PAYLOAD);
     while (len--) { *current++ = rf->spi_transfer(0xFF); }
     while (blank_len--) { rf->spi_transfer(0xff); }
 
@@ -326,7 +334,7 @@ void rf24_stopListening(RF24* rf)
     rf->config_reg = (unsigned char)(rf->config_reg & ~_BV(PRIM_RX));
     rf24_write_register(rf, NRF_CONFIG, rf->config_reg, 0);
 
-    rf24_write_register(rf, EN_RXADDR, (unsigned char)(read_register(EN_RXADDR) | _BV(pgm_read_byte(&child_pipe_enable[0]))), 0); // Enable RX on pipe0
+    rf24_write_register(rf, EN_RXADDR, (unsigned char)(rf24_read_register(rf, EN_RXADDR) | _BV(pgm_read_byte(&child_pipe_enable[0]))), 0); // Enable RX on pipe0
 }
 
 /****************************************************************************/
@@ -592,8 +600,8 @@ void rf24_openWritingPipe(RF24* rf, const unsigned char* address)
 {
     // Note that AVR 8-bit uC's store this LSB first, and the NRF24L01(+)
     // expects it LSB first too, so we're good.
-    rf24_write_register(RX_ADDR_P0, address, rf->addr_width, 0);
-    rf24_write_register(TX_ADDR, address, rf->addr_width, 0);
+    rf24_write_register_buffer(rf, RX_ADDR_P0, address, rf->addr_width);
+    rf24_write_register_buffer(rf, TX_ADDR, address, rf->addr_width);
 }
 
 /****************************************************************************/
@@ -709,7 +717,7 @@ void rf24_enableAckPayload(RF24* rf)
         rf24_write_register(rf, FEATURE, rf24_read_register(rf, FEATURE) | _BV(EN_ACK_PAY) | _BV(EN_DPL), 0);
 
         // Enable dynamic payload on pipes 0 & 1
-        rf24_write_register(DYNPD, rf24_read_register(rf, DYNPD) | _BV(DPL_P1) | _BV(DPL_P0));
+        rf24_write_register(rf, DYNPD, rf24_read_register(rf, DYNPD) | _BV(DPL_P1) | _BV(DPL_P0), 0);
         rf->dynamic_payloads_enabled = 1;
         rf->ack_payloads_enabled = 1;
     }
@@ -892,7 +900,7 @@ void rf24_setCRCLength(RF24* rf, rf24_crclength_e length)
         rf->config_reg |= _BV(EN_CRC);
         rf->config_reg |= _BV(CRCO);
     }
-    rf24_write_register(rf, ,NRF_CONFIG, rf->config_reg, 0);
+    rf24_write_register(rf, NRF_CONFIG, rf->config_reg, 0);
 }
 
 /****************************************************************************/
@@ -976,7 +984,7 @@ void rf24_stopConstCarrier(RF24* rf)
      * however, both registers are set PWR_UP = 0 will turn TX mode off.
      */
     rf24_powerDown(rf);  // per datasheet recommendation (just to be safe)
-    rf24_write_register(rf, RF_SETUP, (read_register(RF_SETUP) & ~_BV(CONT_WAVE) & ~_BV(PLL_LOCK)), 0);
+    rf24_write_register(rf, RF_SETUP, (rf24_read_register(rf, RF_SETUP) & ~_BV(CONT_WAVE) & ~_BV(PLL_LOCK)), 0);
     rf->set_ce_pin(0);
 }
 

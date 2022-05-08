@@ -13,11 +13,12 @@
 #include "pico/stdlib.h"  // printf(), sleep_ms(), getchar_timeout_us(), to_us_since_boot(), get_absolute_time()
 #include "pico/bootrom.h" // reset_usb_boot()
 #include <tusb.h>         // tud_cdc_connected()
-#include <RF24.h>         // RF24 radio object
+#include "../RF24.h"         // RF24 radio object
 #include "defaultPins.h"  // board presumptive default pin numbers for CE_PIN and CSN_PIN
+#include "pico_port.h"
 
 // instantiate an object for the nRF24L01 transceiver
-RF24 radio(CE_PIN, CSN_PIN);
+RF24 rf;
 
 // Used to control whether this node is sending or receiving
 bool role = false; // true = TX role, false = RX role
@@ -44,14 +45,24 @@ bool setup()
         sleep_ms(10);
     }
 
+    pico_port_init();
+
+    rf24_init(&rf);
+    rf.set_ce_pin = pico_set_ce_pin;
+    rf.set_csn_pin = pico_set_csn_pin;
+    rf.spi_transfer =  pico_spi_transfer;
+    rf.delay_ms = pico_delay_ms;
+    rf.delay_us = pico_delay_us;
+    rf.millis = pico_millis;
+
     // initialize the transceiver on the SPI bus
-    if (!radio.begin()) {
+    if (!rf24_begin(&rf)) {
         printf("radio hardware is not responding!!\n");
         return false;
     }
 
     // print example's introductory prompt
-    printf("RF24/examples_pico/gettingStarted\n");
+    printf("RF24-c/examples_pico/gettingStarted\n");
 
     // To set the radioNumber via the Serial terminal on startup
     printf("Which radio is this? Enter '0' or '1'. Defaults to '0'\n");
@@ -62,24 +73,24 @@ bool setup()
     // Set the PA Level low to try preventing power supply related problems
     // because these examples are likely run with nodes in close proximity to
     // each other.
-    radio.setPALevel(RF24_PA_LOW); // RF24_PA_MAX is default.
+    rf24_setPALevel(&rf, RF24_PA_LOW, 1); // RF24_PA_MAX is default.
 
     // save on transmission time by setting the radio to only transmit the
     // number of bytes we need to transmit a float
-    radio.setPayloadSize(sizeof(payload)); // float datatype occupies 4 bytes
+    rf24_setPayloadSize(&rf, sizeof(payload)); // float datatype occupies 4 bytes
 
     // set the TX address of the RX node into the TX pipe
-    radio.openWritingPipe(address[radioNumber]); // always uses pipe 0
+    rf24_openWritingPipe(&rf, address[radioNumber]); // always uses pipe 0
 
     // set the RX address of the TX node into a RX pipe
-    radio.openReadingPipe(1, address[!radioNumber]); // using pipe 1
+    rf24_openReadingPipe(&rf, 1, address[!radioNumber]); // using pipe 1
 
     // additional setup specific to the node's role
     if (role) {
-        radio.stopListening(); // put radio in TX mode
+        rf24_stopListening(&rf); // put radio in TX mode
     }
     else {
-        radio.startListening(); // put radio in RX mode
+        rf24_startListening(&rf); // put radio in RX mode
     }
 
     // For debugging info
@@ -98,7 +109,7 @@ void loop()
         // This device is a TX node
 
         uint64_t start_timer = to_us_since_boot(get_absolute_time()); // start the timer
-        bool report = radio.write(&payload, sizeof(payload));         // transmit & save the report
+        bool report = rf24_write(&rf, &payload, sizeof(payload), 0);         // transmit & save the report
         uint64_t end_timer = to_us_since_boot(get_absolute_time());   // end the timer
 
         if (report) {
@@ -120,9 +131,9 @@ void loop()
         // This device is a RX node
 
         uint8_t pipe;
-        if (radio.available(&pipe)) {               // is there a payload? get the pipe number that recieved it
-            uint8_t bytes = radio.getPayloadSize(); // get the size of the payload
-            radio.read(&payload, bytes);            // fetch payload from FIFO
+        if (rf24_available(&rf, &pipe)) {               // is there a payload? get the pipe number that recieved it
+            uint8_t bytes = rf24_getPayloadSize(&rf); // get the size of the payload
+            rf24_read(&rf, &payload, bytes);            // fetch payload from FIFO
 
             // print the size of the payload, the pipe number, payload's value
             printf("Received %d bytes on pipe %d: %f\n", bytes, pipe, payload);
@@ -138,18 +149,18 @@ void loop()
 
             role = true;
             printf("*** CHANGING TO TRANSMIT ROLE -- PRESS 'R' TO SWITCH BACK\n");
-            radio.stopListening();
+            rf24_stopListening(&rf);
         }
         else if ((input == 'R' || input == 'r') && role) {
             // Become the RX node
 
             role = false;
             printf("*** CHANGING TO RECEIVE ROLE -- PRESS 'T' TO SWITCH BACK\n");
-            radio.startListening();
+            rf24_startListening(&rf);
         }
         else if (input == 'b' || input == 'B') {
             // reset to bootloader
-            radio.powerDown();
+            rf24_powerDown(&rf);
             reset_usb_boot(0, 0);
         }
     }

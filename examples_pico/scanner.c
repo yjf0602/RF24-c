@@ -25,11 +25,11 @@
 #include "pico/stdlib.h"  // printf(), sleep_ms(), getchar_timeout_us(), to_us_since_boot(), get_absolute_time()
 #include "pico/bootrom.h" // reset_usb_boot()
 #include <tusb.h>         // tud_cdc_connected()
-#include <RF24.h>         // RF24 radio object, rf24_min()
+#include <../RF24.h>         // RF24 radio object, rf24_min()
 #include "defaultPins.h"  // board presumptive default pin numbers for CE_PIN and CSN_PIN
 
 // instantiate an object for the nRF24L01 transceiver
-RF24 radio(CE_PIN, CSN_PIN);
+RF24 rf;
 
 // Channel info
 const uint8_t num_channels = 126;
@@ -55,11 +55,11 @@ int main()
     // print example's name
     printf("RF24/examples_pico/scanner\n");
 
-    radio.setAutoAck(false);
+    rf24_setAutoAck(&rf, 0);
 
     // Get into standby mode
-    radio.startListening();
-    radio.stopListening();
+    rf24_startListening(&rf);
+    rf24_stopListening(&rf);
 
     // radio.printDetails();
 

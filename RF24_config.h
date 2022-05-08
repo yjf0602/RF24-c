@@ -36,6 +36,14 @@
 #define rf24_max(a, b) (a>b?a:b)
 #define rf24_min(a, b) (a<b?a:b)
 
+#ifndef _BV
+    #define _BV(x) (1<<(x))
+#endif
+
+#ifndef pgm_read_byte
+    #define pgm_read_byte(addr) (*(const unsigned char *)(addr))
+#endif
+
 /** @brief The default SPI speed (in Hz) */
 #ifndef RF24_SPI_SPEED
 #define RF24_SPI_SPEED 10000000
